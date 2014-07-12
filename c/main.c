@@ -25,7 +25,6 @@ void get_circle (GLfloat *points, double centerx, double centery, double radius,
         double b = cos(angle)*radius;
         points[i*2] = centerx+a;
         points[i*2+1] = centery+b;
-        //printf("%f\n", points[i*2]);
     }
 }
 
@@ -90,8 +89,6 @@ int main (void) {
     glGenBuffers(1, outer_circle);
     glBindBuffer(GL_ARRAY_BUFFER, outer_circle[0]);
     GLfloat points[200];
-    //points[200] = 0.0;
-    //points[201] = 0.0;
     get_circle(points, 0, 0, 0.5, 100, 0);
     glBufferData(GL_ARRAY_BUFFER, sizeof(points), points, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
@@ -107,13 +104,6 @@ int main (void) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(1);
-    GLubyte outer_circle_indices[300]; //GLubyte should be fine here, because indices are lower than 255
-    for (i=0; i<=100; i++) {
-        outer_circle_indices[i*3] = 0;
-        outer_circle_indices[i*3+1] = i+1;
-        outer_circle_indices[i*3+2] = i+2;
-    }
-    outer_circle_indices[299] = 0; //wrap around to the beginning
 
     //shaders
     GLchar *vertexsource = read_file_to_buffer("shader.vert");
@@ -181,8 +171,7 @@ int main (void) {
         }
         glClearColor(0.0, 0.0, 0.0, 0.5);
         glClear(GL_COLOR_BUFFER_BIT);
-        //glDrawElements(GL_TRIANGLES, 1, GL_UNSIGNED_BYTE, outer_circle_indices);
-        glDrawArrays(GL_LINE_LOOP, 0, 100);
+        glDrawArrays(GL_LINES, 0, 50);
         SDL_GL_SwapWindow(window);
     }
 
