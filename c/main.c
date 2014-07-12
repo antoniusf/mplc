@@ -87,33 +87,33 @@ int main (void) {
 
     //vbo data
     GLuint outer_circle[2];
-    glGenBuffers(1, outer_circle);
+    glGenBuffers(2, outer_circle);
     glBindBuffer(GL_ARRAY_BUFFER, outer_circle[0]);
-    GLfloat points[200];
-    //points[200] = 0.0;
-    //points[201] = 0.0;
-    get_circle(points, 0, 0, 0.5, 100, 0);
+    GLfloat points[202];
+    points[0] = 0.0;
+    points[1] = 0.0;
+    get_circle(&points[2], 0, 0, 0.5, 100, 0);
     glBufferData(GL_ARRAY_BUFFER, sizeof(points), points, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, outer_circle[1]);
-    GLfloat colors[400];
-    for (i=0; i<400; i+=4) {
+    GLfloat colors[404];
+    for (i=0; i<404; i+=4) {
         colors[i] = 0.7;
         colors[i+1] = 0.7;
         colors[i+2] = 0.7;
-        colors[i+3] = 1.0;
+        colors[i+3] = 0.5;
     }
     glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(1);
-    GLubyte outer_circle_indices[300]; //GLubyte should be fine here, because indices are lower than 255
-    for (i=0; i<=100; i++) {
+    GLuint outer_circle_indices[300];
+    for (i=0; i<100; i++) {
         outer_circle_indices[i*3] = 0;
         outer_circle_indices[i*3+1] = i+1;
         outer_circle_indices[i*3+2] = i+2;
     }
-    outer_circle_indices[299] = 0; //wrap around to the beginning
+    outer_circle_indices[299] = 1; //wrap around to the beginning
 
     //shaders
     GLchar *vertexsource = read_file_to_buffer("shader.vert");
@@ -179,10 +179,15 @@ int main (void) {
                     break;
             }
         }
-        glClearColor(0.0, 0.0, 0.0, 0.5);
+        glUseProgram(shaderprogram);
+        glClearColor(0.0, 0.0, 0.0, 1.0);
         glClear(GL_COLOR_BUFFER_BIT);
-        //glDrawElements(GL_TRIANGLES, 1, GL_UNSIGNED_BYTE, outer_circle_indices);
-        glDrawArrays(GL_LINE_LOOP, 0, 100);
+        GLuint ibo;
+        glGenBuffers(1, &ibo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(outer_circle_indices), outer_circle_indices, GL_STATIC_DRAW);
+        glDrawElements(GL_TRIANGLES, 300, GL_UNSIGNED_INT, NULL);
+        //glDrawArrays(GL_TRIANGLE_FAN, 0, 101);
         SDL_GL_SwapWindow(window);
     }
 
