@@ -81,11 +81,11 @@ int main (void) {
     //OpenGL setup
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
 
-    //vbo data
+    //Outer (big) circle
+    GLuint outer_circle_array;
+    glGenVertexArrays(1, &outer_circle_array);
+    glBindVertexArray(outer_circle_array);
     GLuint outer_circle[2];
     glGenBuffers(2, outer_circle);
     glBindBuffer(GL_ARRAY_BUFFER, outer_circle[0]);
@@ -114,6 +114,52 @@ int main (void) {
         outer_circle_indices[i*3+2] = i+2;
     }
     outer_circle_indices[299] = 1; //wrap around to the beginning
+    GLuint ibo;
+    glGenBuffers(1, &ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(outer_circle_indices), outer_circle_indices, GL_STATIC_DRAW);
+
+    //Ring
+    GLuint ring_array;
+    glGenVertexArrays(1, &ring_array);
+    glBindVertexArray(ring_array);
+    GLuint ring[2];
+    glGenBuffers(2, ring);
+    glBindBuffer(GL_ARRAY_BUFFER, ring[0]);
+    GLfloat ring_points[402];
+    for (i=0; i<200; i++) {
+        ring_points[i] = points[i+2];
+    }
+    get_circle(&ring_points[200], 0, 0, 0.40, 100, 0);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(ring_points), ring_points, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, outer_circle[1]);
+    GLfloat ring_colors[804];
+    for (i=0; i<804; i+=4) {
+        ring_colors[i] = 1.0;
+        ring_colors[i+1] = 1.0;
+        ring_colors[i+2] = 1.0;
+        ring_colors[i+3] = 0.5;
+    }
+    glBufferData(GL_ARRAY_BUFFER, sizeof(ring_colors), ring_colors, GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(1);
+    GLuint ring_indices[600];
+    int j;
+    for (i=0; i<100; i++) {
+        j = i*6;
+        ring_indices[j] = i;
+        ring_indices[j+1] = (i+1)%100;
+        ring_indices[j+2] = i+100;
+        ring_indices[j+3] = (i+1)%100+100;
+        ring_indices[j+4] = i+100;
+        ring_indices[j+5] = (i+1)%100;
+    }
+    GLuint ring_ibo;
+    glGenBuffers(1, &ring_ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ring_ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(ring_indices), ring_indices, GL_STATIC_DRAW);
 
     //shaders
     GLchar *vertexsource = read_file_to_buffer("shader.vert");
@@ -171,7 +217,7 @@ int main (void) {
                     }
                     break;
                 case SDL_WINDOWEVENT:
-                    if (e.window.event == SDL_WINDOWEVENT_LEAVE) {
+                    if (e.window.event == SDL_WINDOWEVENT_LEAVE || e.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                         quit = 1;
                     }
                     break;
@@ -182,15 +228,18 @@ int main (void) {
         glUseProgram(shaderprogram);
         glClearColor(0.0, 0.0, 0.0, 1.0);
         glClear(GL_COLOR_BUFFER_BIT);
-        GLuint ibo;
-        glGenBuffers(1, &ibo);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-        glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(outer_circle_indices), outer_circle_indices, GL_STATIC_DRAW);
+        glBindVertexArray(outer_circle_array);
         glDrawElements(GL_TRIANGLES, 300, GL_UNSIGNED_INT, NULL);
+        glBindVertexArray(ring_array);
+        glDrawElements(GL_TRIANGLES, 600, GL_UNSIGNED_INT, NULL);
         //glDrawArrays(GL_TRIANGLE_FAN, 0, 101);
         SDL_GL_SwapWindow(window);
     }
 
+    glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(1);
+    glDeleteBuffers(2, outer_circle);
+    glDeleteVertexArrays(1, &outer_circle_array);
     SDL_GL_DeleteContext(context);
     SDL_DestroyWindow(window);
     SDL_Quit();

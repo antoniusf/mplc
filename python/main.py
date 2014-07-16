@@ -23,7 +23,7 @@ window_x, window_y = screen.width/2-320, screen.height/2-320
 #hacky screenshot transparence thingy. definitely not portable.
 os.system("scrot -z /tmp/scr.png")
 screenshot = pyglet.image.load("/tmp/scr.png")
-bg = screenshot.get_region(window_x-3, window_y+48, window.width, window.height)
+bg = screenshot.get_region(window_x, window_y+24, window.width, window.height)
 
 
 ring_config = []
