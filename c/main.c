@@ -92,7 +92,7 @@ int main (void) {
     GLfloat points[202];
     points[0] = 0.0;
     points[1] = 0.0;
-    get_circle(&points[2], 0, 0, 0.5, 100, 0);
+    get_circle(&points[2], 0, 0, 0.625, 100, 0);
     glBufferData(GL_ARRAY_BUFFER, sizeof(points), points, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
@@ -130,7 +130,7 @@ int main (void) {
     for (i=0; i<200; i++) {
         ring_points[i] = points[i+2];
     }
-    get_circle(&ring_points[200], 0, 0, 0.40, 100, 0);
+    get_circle(&ring_points[200], 0, 0, 0.53125, 100, 0);
     glBufferData(GL_ARRAY_BUFFER, sizeof(ring_points), ring_points, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
@@ -160,6 +160,31 @@ int main (void) {
     glGenBuffers(1, &ring_ibo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ring_ibo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(ring_indices), ring_indices, GL_STATIC_DRAW);
+
+    //Play triangle
+    //New approach: just put all GLuints in one array. Layout: [VAO, Position VBO, Color VBO, Index BO]
+    //Actually, I don't need the IBO this time. But I want to try that out.
+    GLuint play[4];
+    glGenVertexArrays(1, &play[0]);
+    glBindVertexArray(play[0]);
+    glGenBuffers(3, &play[1]);
+    glBindBuffer(GL_ARRAY_BUFFER, play[1]);
+    GLfloat play_points[6];
+    get_circle(play_points, 0, 0, 0.375, 3, M_PI_2);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(play_points), play_points, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, play[2]);
+    GLfloat play_colors[16];
+    for (i=0; i<16; i++) {
+        play_colors[i] = 1.0;
+    }
+    glBufferData(GL_ARRAY_BUFFER, sizeof(play_colors), play_colors, GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, play[3]);
+    GLuint play_indices[3] = { 0, 1, 2 };
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(play_indices), play_indices, GL_STATIC_DRAW);
 
     //shaders
     GLchar *vertexsource = read_file_to_buffer("shader.vert");
@@ -232,6 +257,8 @@ int main (void) {
         glDrawElements(GL_TRIANGLES, 300, GL_UNSIGNED_INT, NULL);
         glBindVertexArray(ring_array);
         glDrawElements(GL_TRIANGLES, 600, GL_UNSIGNED_INT, NULL);
+        glBindVertexArray(play[0]);
+        glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, NULL);
         //glDrawArrays(GL_TRIANGLE_FAN, 0, 101);
         SDL_GL_SwapWindow(window);
     }
