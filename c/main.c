@@ -49,6 +49,7 @@ char *read_file_to_buffer (char *file) {
 int main (void) {
 
     int i;
+    int j;
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         printf("SDL initialization failed: %s", SDL_GetError());
         return 1;
@@ -126,7 +127,7 @@ int main (void) {
     GLuint ring[2];
     glGenBuffers(2, ring);
     glBindBuffer(GL_ARRAY_BUFFER, ring[0]);
-    GLfloat ring_points[402];
+    GLfloat ring_points[400];
     for (i=0; i<200; i++) {
         ring_points[i] = points[i+2];
     }
@@ -134,19 +135,28 @@ int main (void) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(ring_points), ring_points, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, outer_circle[1]);
-    GLfloat ring_colors[804];
-    for (i=0; i<804; i+=4) {
-        ring_colors[i] = 1.0;
-        ring_colors[i+1] = 1.0;
-        ring_colors[i+2] = 1.0;
-        ring_colors[i+3] = 0.5;
+    glBindBuffer(GL_ARRAY_BUFFER, ring[1]);
+    int progress = 42;
+    GLfloat ring_colors[800];
+    for (i=0; i<200; i++) {
+        j = i*4;
+        if (i%100 < progress) {
+            ring_colors[j] = 1.0;
+            ring_colors[j+1] = 1.0;
+            ring_colors[j+2] = 1.0;
+            ring_colors[j+3] = 0.5;
+        }
+        else {
+            ring_colors[j] = 0.0;
+            ring_colors[j+1] = 0.0;
+            ring_colors[j+2] = 0.0;
+            ring_colors[j+3] = 0.3;
+        }
     }
     glBufferData(GL_ARRAY_BUFFER, sizeof(ring_colors), ring_colors, GL_STATIC_DRAW);
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(1);
     GLuint ring_indices[600];
-    int j;
     for (i=0; i<100; i++) {
         j = i*6;
         ring_indices[j] = i;
