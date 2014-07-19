@@ -1,4 +1,8 @@
 #include <stdio.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_shape.h>
 #include <GL/gl.h>
@@ -44,6 +48,15 @@ char *read_file_to_buffer (char *file) {
     fclose(fileptr);
     buffer[length] = 0;
     return buffer;
+}
+
+void fifo_send (char *string, int len) {
+    //int fd = open("/tmp/mplc", O_WRONLY|O_NONBLOCK);
+    //write(fd, string, sizeof(string));
+    //close(fd);
+    FILE *fifo = fopen("/tmp/mplc", "w");
+    fwrite(string, len, 1, fifo);
+    fclose(fifo);
 }
 
 int main (void) {
@@ -136,7 +149,7 @@ int main (void) {
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, ring[1]);
-    int progress = 42;
+    int progress = 1;
     GLfloat ring_colors[800];
     for (i=0; i<200; i++) {
         j = i*4;
@@ -236,9 +249,11 @@ int main (void) {
         printf("OpenGL shader linking failed.\n");
         return 0;
     }
-
+    
     //Main Loop
     int quit = 0;
+    Uint32 next_update = 0;
+    char pos=0;
     SDL_Event e;
     while (!quit) {
         while (SDL_PollEvent(&e)) {
@@ -251,6 +266,12 @@ int main (void) {
                         quit = 1;
                     }
                     break;
+                case SDL_MOUSEBUTTONDOWN:
+                    if (e.button.button == SDL_BUTTON_LEFT) {
+                        printf("pause\n");
+                        fifo_send("pause\n", 6);
+                    }
+                    break;
                 case SDL_WINDOWEVENT:
                     if (e.window.event == SDL_WINDOWEVENT_LEAVE || e.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
                         quit = 1;
@@ -259,6 +280,53 @@ int main (void) {
                 default:
                     break;
             }
+        }
+        if ( next_update < SDL_GetTicks() ) {
+            next_update = SDL_GetTicks()+100;
+            fifo_send("get_percent_pos\n", 16);
+            char *answer = read_file_to_buffer("/tmp/mplo");
+            //printf("%s\n", answer);
+            //printf("yay\n");
+            //FILE *mplo = fopen("/tmp/mplo", "w");
+            //fwrite("", 0, 1, mplo);
+            //fclose(mplo);
+            
+            char *header = "ANS_PERCENT_POSITION=";
+            i=0;
+            while (answer[i] != 0) {
+                if ( answer[i] == header[pos] ) {
+                    pos += 1;
+                }
+                else {
+                    pos = 0;
+                }
+                if ( pos == 21 ) {
+                    progress = answer[i+1]-48;
+                    if ( answer[i+2] != 10 ) {
+                        progress *= 10;
+                        progress += answer[i+2]-48;
+                    }
+                }
+                i++;
+            }
+            for (i=0; i<200; i++) {
+                j = i*4;
+                if (i%100 < progress) {
+                    ring_colors[j] = 1.0;
+                    ring_colors[j+1] = 1.0;
+                    ring_colors[j+2] = 1.0;
+                    ring_colors[j+3] = 0.5;
+                }
+                else {
+                    ring_colors[j] = 0.0;
+                    ring_colors[j+1] = 0.0;
+                    ring_colors[j+2] = 0.0;
+                    ring_colors[j+3] = 0.3;
+                }
+            }
+            glBindBuffer(GL_ARRAY_BUFFER, ring[1]);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(ring_colors), ring_colors, GL_STATIC_DRAW);
+            
         }
         glUseProgram(shaderprogram);
         glClearColor(0.0, 0.0, 0.0, 1.0);
