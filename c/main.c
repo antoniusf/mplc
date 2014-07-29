@@ -59,6 +59,69 @@ void fifo_send (char *string, int len) {
     fclose(fifo);
 }
 
+int get_progress (void) {
+    fifo_send("get_percent_pos\n", 16);
+    char *header = "ANS_PERCENT_POSITION=";
+    char *answer = read_file_to_buffer("/tmp/mplo");
+    //printf("%s\n", answer);
+    //printf("yay\n");
+    //FILE *mplo = fopen("/tmp/mplo", "w");
+    //fwrite("", 0, 1, mplo);
+    //fclose(mplo);
+    
+    int i=0;
+    char pos=0;
+    int progress;
+    while (answer[i] != 0) {
+        if ( answer[i] == header[pos] ) {
+            pos += 1;
+        }
+        else {
+            pos = 0;
+        }
+        if ( pos == 21 ) {
+            //printf("%c%c%c%c\n", answer[i-1], answer[i], answer[i+1], answer[i+2]);
+            progress = answer[i+1]-48;
+            if ( answer[i+2] != 10 ) {
+                progress *= 10;
+                progress += answer[i+2]-48;
+            }
+            //printf("%i\n", progress);
+        }
+        i++;
+    }
+    return progress;
+}
+
+int get_pause (void) {
+    fifo_send("get_property pause\n", 19);
+    char *header = "ANS_pause=";
+    char *answer = read_file_to_buffer("/tmp/mplo");
+    
+    int i=0;
+    char pos=0;
+    int pause=0;
+    while (answer[i] != 0) {
+        if (answer[i] == header[pos]) {
+            pos += 1;
+        }
+        else {
+            pos = 0;
+        }
+        if (pos == 10) {
+            if (answer[i+1] == 121) {
+                pause = 1;
+            }
+            else if (answer[i+1] == 110) {
+                pause = 0;
+            }
+        }
+        i++;
+    }
+    //printf("pause: %i\n", pause);
+    return pause;
+}
+
 int main (void) {
 
     int i;
@@ -209,6 +272,34 @@ int main (void) {
     GLuint play_indices[3] = { 0, 1, 2 };
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(play_indices), play_indices, GL_STATIC_DRAW);
 
+    //Pause bars
+    GLuint pause[4];
+    glGenVertexArrays(1, &pause[0]);
+    glBindVertexArray(pause[0]);
+    glGenBuffers(3, &pause[1]);
+    glBindBuffer(GL_ARRAY_BUFFER, pause[1]);
+    GLfloat left, bottom, top, right, middle;
+    left = -0.375/sqrt(2);
+    bottom = left;
+    right = -left;
+    top = right;
+    middle = 0.25/sqrt(2);
+    GLfloat pause_points[16] = {left, bottom, left+middle, bottom, left+middle, top, left, top, right-middle, bottom, right, bottom, right, top, right-middle, top};
+    glBufferData(GL_ARRAY_BUFFER, sizeof(pause_points), pause_points, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, pause[2]);
+    GLfloat pause_colors[32];
+    for (i=0; i<32; i++) {
+        pause_colors[i] = 1.0;
+    }
+    glBufferData(GL_ARRAY_BUFFER, sizeof(pause_colors), pause_colors, GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, pause[3]);
+    GLuint pause_indices[12] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(pause_indices), pause_indices, GL_STATIC_DRAW);
+
     //shaders
     GLchar *vertexsource = read_file_to_buffer("shader.vert");
     GLchar *fragmentsource = read_file_to_buffer("shader.frag");
@@ -253,7 +344,7 @@ int main (void) {
     //Main Loop
     int quit = 0;
     Uint32 next_update = 0;
-    char pos=0;
+    int pause_state;
     SDL_Event e;
     while (!quit) {
         while (SDL_PollEvent(&e)) {
@@ -281,34 +372,10 @@ int main (void) {
                     break;
             }
         }
+
         if ( next_update < SDL_GetTicks() ) {
             next_update = SDL_GetTicks()+100;
-            fifo_send("get_percent_pos\n", 16);
-            char *answer = read_file_to_buffer("/tmp/mplo");
-            //printf("%s\n", answer);
-            //printf("yay\n");
-            //FILE *mplo = fopen("/tmp/mplo", "w");
-            //fwrite("", 0, 1, mplo);
-            //fclose(mplo);
-            
-            char *header = "ANS_PERCENT_POSITION=";
-            i=0;
-            while (answer[i] != 0) {
-                if ( answer[i] == header[pos] ) {
-                    pos += 1;
-                }
-                else {
-                    pos = 0;
-                }
-                if ( pos == 21 ) {
-                    progress = answer[i+1]-48;
-                    if ( answer[i+2] != 10 ) {
-                        progress *= 10;
-                        progress += answer[i+2]-48;
-                    }
-                }
-                i++;
-            }
+            progress = get_progress();
             for (i=0; i<200; i++) {
                 j = i*4;
                 if (i%100 < progress) {
@@ -326,7 +393,8 @@ int main (void) {
             }
             glBindBuffer(GL_ARRAY_BUFFER, ring[1]);
             glBufferData(GL_ARRAY_BUFFER, sizeof(ring_colors), ring_colors, GL_STATIC_DRAW);
-            
+
+            pause_state = get_pause();
         }
         glUseProgram(shaderprogram);
         glClearColor(0.0, 0.0, 0.0, 1.0);
@@ -335,8 +403,14 @@ int main (void) {
         glDrawElements(GL_TRIANGLES, 300, GL_UNSIGNED_INT, NULL);
         glBindVertexArray(ring_array);
         glDrawElements(GL_TRIANGLES, 600, GL_UNSIGNED_INT, NULL);
-        glBindVertexArray(play[0]);
-        glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, NULL);
+        if (pause_state == 0) {
+            glBindVertexArray(play[0]);
+            glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, NULL);
+        }
+        else {
+            glBindVertexArray(pause[0]);
+            glDrawElements(GL_TRIANGLES, 16, GL_UNSIGNED_INT, NULL);
+        }
         //glDrawArrays(GL_TRIANGLE_FAN, 0, 101);
         SDL_GL_SwapWindow(window);
     }
