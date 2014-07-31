@@ -122,6 +122,50 @@ int get_pause (void) {
     return pause;
 }
 
+GLuint load_shaders (char *vertex_path, char *fragment_path) {
+
+    GLchar *vertexsource = read_file_to_buffer(vertex_path);
+    GLchar *fragmentsource = read_file_to_buffer(fragment_path);
+    if ((vertexsource == NULL) || (fragmentsource == NULL)) {
+        printf("Could not find shaders.\n");
+        return 0;
+    }
+
+    GLuint vertexshader = glCreateShader(GL_VERTEX_SHADER);
+    glShaderSource(vertexshader, 1, (const GLchar **) &vertexsource, 0);
+    glCompileShader(vertexshader);
+    int isCompiled_VS;
+    glGetShaderiv(vertexshader, GL_COMPILE_STATUS, &isCompiled_VS);
+    if (isCompiled_VS == 0) {
+        printf("OpenGL vertex shader compilation failed. Source:\n\n%s\n", vertexsource);
+        return 0;
+    }
+
+    GLuint fragmentshader = glCreateShader(GL_FRAGMENT_SHADER);
+    glShaderSource(fragmentshader, 1, (const GLchar **) &fragmentsource, 0);
+    glCompileShader(fragmentshader);
+    int isCompiled_FS;
+    glGetShaderiv(fragmentshader, GL_COMPILE_STATUS, &isCompiled_FS);
+    if (isCompiled_FS == 0) {
+        printf("OpenGL fragment shader compilation failed.\n");
+        return 0;
+    }
+
+    GLuint shaderprogram = glCreateProgram();
+    glAttachShader(shaderprogram, vertexshader);
+    glAttachShader(shaderprogram, fragmentshader);
+    glBindAttribLocation(shaderprogram, 0, "in_Position");
+    glBindAttribLocation(shaderprogram, 1, "in_Color");
+    glLinkProgram(shaderprogram);
+    int IsLinked;
+    glGetProgramiv(shaderprogram, GL_LINK_STATUS, &IsLinked);
+    if (IsLinked == 0) {
+        printf("OpenGL shader linking failed.\n");
+        return 0;
+    }
+    return shaderprogram;
+}
+
 int main (void) {
 
     int i;
@@ -300,47 +344,75 @@ int main (void) {
     GLuint pause_indices[12] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(pause_indices), pause_indices, GL_STATIC_DRAW);
 
+    int skip_value = 0;
+    //left skip arrow
+    GLuint lskip[4];
+    glGenVertexArrays(1, &lskip[0]);
+    glBindVertexArray(lskip[0]);
+    glGenBuffers(3, &lskip[1]);
+    glBindBuffer(GL_ARRAY_BUFFER, lskip[1]);
+    left = -0.375;
+    right = -0.0625;
+    middle = -0.21785;
+    bottom = -0.15625;
+    top = -bottom;
+    GLfloat lskip_points[] = {right, top, right, top, middle, 0.0, right, bottom, right, bottom, middle, top, middle, top, left, 0.0, middle, bottom, middle, bottom};
+    glBufferData(GL_ARRAY_BUFFER, sizeof(lskip_points), lskip_points, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, lskip[2]);
+    GLfloat lskip_colors[40];
+    for (i=0; i<40; i+=4) {
+        if ((i/4 == 2) || (i/4 == 7)) {
+            lskip_colors[i] = 0.0;
+            lskip_colors[i+1] = 0.0;
+            lskip_colors[i+2] = 0.0;
+            lskip_colors[i+3] = 0.5;
+        }
+        else {
+            lskip_colors[i] = 1.0;
+            lskip_colors[i+1] = 1.0;
+            lskip_colors[i+2] = 1.0;
+            lskip_colors[i+3] = 1.0;
+        }
+    }
+    glBufferData(GL_ARRAY_BUFFER, sizeof(lskip_colors), lskip_colors, GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lskip[3]);
+    GLuint lskip_indices[] = {0, 1, 4, 1, 3, 4, 1, 2, 3, 5, 6, 9, 6, 8, 9, 6, 7, 8};
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(lskip_indices), lskip_indices, GL_STATIC_DRAW);
+
+    //right skip arrow
+    GLuint rskip[4];
+    glGenVertexArrays(1, &rskip[0]);
+    glBindVertexArray(rskip[0]);
+    glGenBuffers(3, &rskip[1]);
+    glBindBuffer(GL_ARRAY_BUFFER, rskip[1]);
+    left = 0.375;
+    right = 0.0625;
+    middle = 0.21785;
+    bottom = -0.15625;
+    top = -bottom;
+    GLfloat rskip_points[] = {right, top, right, top, middle, 0.0, right, bottom, right, bottom, middle, top, middle, top, left, 0.0, middle, bottom, middle, bottom};
+    glBufferData(GL_ARRAY_BUFFER, sizeof(rskip_points), rskip_points, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, rskip[2]);
+    GLfloat rskip_colors[40];
+    for (i=0; i<40; i++) {
+        rskip_colors[i] = 1.0;
+    }
+    glBufferData(GL_ARRAY_BUFFER, sizeof(rskip_colors), rskip_colors, GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rskip[3]);
+    GLuint rskip_indices[] = {0, 1, 4, 1, 3, 4, 1, 2, 3, 5, 6, 9, 6, 8, 9, 6, 7, 8};
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(rskip_indices), rskip_indices, GL_STATIC_DRAW);
+
     //shaders
-    GLchar *vertexsource = read_file_to_buffer("shader.vert");
-    GLchar *fragmentsource = read_file_to_buffer("shader.frag");
-    if ((vertexsource == NULL) || (fragmentsource == NULL)) {
-        printf("Could not find shaders.\n");
-        return 0;
-    }
-
-    GLuint vertexshader = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vertexshader, 1, (const GLchar **) &vertexsource, 0);
-    glCompileShader(vertexshader);
-    int isCompiled_VS;
-    glGetShaderiv(vertexshader, GL_COMPILE_STATUS, &isCompiled_VS);
-    if (isCompiled_VS == 0) {
-        printf("OpenGL vertex shader compilation failed. Source:\n\n%s\n", vertexsource);
-        return 0;
-    }
-
-    GLuint fragmentshader = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fragmentshader, 1, (const GLchar **) &fragmentsource, 0);
-    glCompileShader(fragmentshader);
-    int isCompiled_FS;
-    glGetShaderiv(fragmentshader, GL_COMPILE_STATUS, &isCompiled_FS);
-    if (isCompiled_FS == 0) {
-        printf("OpenGL fragment shader compilation failed.\n");
-        return 0;
-    }
-
-    GLuint shaderprogram = glCreateProgram();
-    glAttachShader(shaderprogram, vertexshader);
-    glAttachShader(shaderprogram, fragmentshader);
-    glBindAttribLocation(shaderprogram, 0, "in_Position");
-    glBindAttribLocation(shaderprogram, 1, "in_Color");
-    glLinkProgram(shaderprogram);
-    int IsLinked;
-    glGetProgramiv(shaderprogram, GL_LINK_STATUS, &IsLinked);
-    if (IsLinked == 0) {
-        printf("OpenGL shader linking failed.\n");
-        return 0;
-    }
-    
+    GLuint shaderprogram = load_shaders("shader.vert", "shader.frag");
+    GLuint ringshader = load_shaders("shader.vert", "ringshader.frag");
     //Main Loop
     int quit = 0;
     Uint32 next_update = 0;
@@ -401,11 +473,17 @@ int main (void) {
         glClear(GL_COLOR_BUFFER_BIT);
         glBindVertexArray(outer_circle_array);
         glDrawElements(GL_TRIANGLES, 300, GL_UNSIGNED_INT, NULL);
+        glUseProgram(ringshader);
         glBindVertexArray(ring_array);
         glDrawElements(GL_TRIANGLES, 600, GL_UNSIGNED_INT, NULL);
+        glUseProgram(shaderprogram);
         if (pause_state == 0) {
-            glBindVertexArray(play[0]);
-            glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, NULL);
+            //glBindVertexArray(play[0]);
+            //glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, NULL);
+            glBindVertexArray(lskip[0]);
+            glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, NULL);
+            //glBindVertexArray(rskip[0]);
+            //glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, NULL);
         }
         else {
             glBindVertexArray(pause[0]);
