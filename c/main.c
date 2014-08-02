@@ -51,12 +51,12 @@ char *read_file_to_buffer (char *file) {
 }
 
 void fifo_send (char *string, int len) {
-    //int fd = open("/tmp/mplc", O_WRONLY|O_NONBLOCK);
-    //write(fd, string, sizeof(string));
-    //close(fd);
-    FILE *fifo = fopen("/tmp/mplc", "w");
-    fwrite(string, len, 1, fifo);
-    fclose(fifo);
+    int fd = open("/tmp/mplc", O_WRONLY|O_NONBLOCK);
+    write(fd, string, len);
+    close(fd);
+    //FILE *fifo = fopen("/tmp/mplc", "w");
+    //fwrite(string, len, 1, fifo);
+    //fclose(fifo);
 }
 
 int get_progress (void) {
@@ -464,10 +464,13 @@ int main (void) {
     GLuint skipshader = load_shaders("shader.vert", "skipshader.frag");
     //Main Loop
     int quit = 0;
+    int quit_block = 0;
     Uint32 next_update = 0;
     int pause_state;
     SDL_Event e;
-    int drag = 0;
+    int drag_right = 0;
+    int drag_left = 0;
+    char *filename;
     while (!quit) {
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
@@ -483,31 +486,35 @@ int main (void) {
                     if (e.button.button == SDL_BUTTON_LEFT) {
                         printf("pause\n");
                         fifo_send("pause\n", 6);
+                        drag_left = 1;
                     }
                     else if (e.button.button == SDL_BUTTON_RIGHT) {
-                        drag = 1;
+                        drag_right = 1;
                     }
                     update_skip_arrows(skip_value, lskip, rskip);
                     break;
                 case SDL_MOUSEBUTTONUP:
-                    if (e.button.button == SDL_BUTTON_RIGHT) {
+                    if (e.button.button == SDL_BUTTON_LEFT) {
+                        drag_left = 0;
+                    }
+                    else if (e.button.button == SDL_BUTTON_RIGHT) {
                         skip_value = 0;
-                        drag = 0;
+                        drag_right = 0;
                         update_skip_arrows(skip_value, lskip, rskip);
                     }
                     break;
                 case SDL_MOUSEMOTION:
-                    if (drag == 1) {
+                    if (drag_right == 1) {
                         skip_value += e.motion.xrel;
                         if (skip_value <= -100) {
                             skip_value = 0;
-                            drag = 0;
+                            drag_right = 0;
                             fifo_send("pt_step -1\n", 11);
                         }
 
                         if (skip_value >= 100) {
                             skip_value = 0;
-                            drag = 0;
+                            drag_right = 0;
                             fifo_send("pt_step 1\n", 10);
                         }
                         update_skip_arrows(skip_value, lskip, rskip);
@@ -515,7 +522,31 @@ int main (void) {
                     break;
                 case SDL_WINDOWEVENT:
                     if (e.window.event == SDL_WINDOWEVENT_LEAVE || e.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
-                        quit = 1;
+                        if (drag_left) {
+                            quit_block = 2;
+                        }
+                        else if (quit_block == 0) {
+                            quit = 1;
+                        }
+                        else {
+                            quit_block -= 1;
+                        }
+                    }
+                    break;
+                case SDL_DROPFILE:
+                    {
+                    filename = e.drop.file;
+                    printf("File: %s, %lu\n", filename, strlen(filename));
+                    int command_length = 12+strlen(filename)+1;
+                    char loadfile_command[command_length];
+                    *loadfile_command = 0;
+                    strcat(loadfile_command, "loadfile ");
+                    strcat(loadfile_command, filename);
+                    strcat(loadfile_command, " 1\n");
+                    printf("%s\n", loadfile_command);
+                    fifo_send(loadfile_command, command_length-1);
+                    SDL_free(filename);
+                    fifo_send("pause\n", 6);
                     }
                     break;
                 default:
@@ -554,7 +585,7 @@ int main (void) {
         glUseProgram(ringshader);
         glBindVertexArray(ring_array);
         glDrawElements(GL_TRIANGLES, 600, GL_UNSIGNED_INT, NULL);
-        if (drag == 0) {
+        if (drag_right == 0) {
             glUseProgram(shaderprogram);
             if (pause_state == 0) {
                 glBindVertexArray(play[0]);
