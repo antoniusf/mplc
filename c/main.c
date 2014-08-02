@@ -166,10 +166,54 @@ GLuint load_shaders (char *vertex_path, char *fragment_path) {
     return shaderprogram;
 }
 
+void update_skip_arrows (int skip_value, GLuint lskip[4], GLuint rskip[4]) {
+
+    GLfloat lskip_left = -0.375*1.3;
+    GLfloat lskip_right = -0.0625*1.3;
+    GLfloat lskip_middle = -0.21785*1.3;
+    GLfloat lskip_bottom = -0.15625*1.3;
+    GLfloat lskip_top = -lskip_bottom;
+
+    GLfloat rskip_left = -lskip_right;
+    GLfloat rskip_right = -lskip_left;
+    GLfloat rskip_middle = -lskip_middle;
+    GLfloat rskip_bottom = lskip_bottom;
+    GLfloat rskip_top = lskip_top;
+
+    GLfloat first_arrow_factor = 0.0;
+    GLfloat second_arrow_factor = 0.0;
+    if ((skip_value >= -50) && (skip_value < 0)) {
+        first_arrow_factor = 0.15625*skip_value/50*1.3;
+    }
+    if (skip_value < -50) {
+        second_arrow_factor = 0.15625*(skip_value+50)/50*1.3;
+        first_arrow_factor = -0.15625*1.3;
+    }
+
+    GLfloat third_arrow_factor = 0.0;
+    GLfloat fourth_arrow_factor = 0.0;
+    if ((skip_value <= 50) && (skip_value > 0)) {
+        third_arrow_factor = 0.15625*skip_value/50*1.3;
+    }
+    if (skip_value > 50) {
+        fourth_arrow_factor = 0.15625*(skip_value-50)/50*1.3;
+        third_arrow_factor = 0.15625*1.3;
+    }
+
+   GLfloat lskip_points[] = {lskip_right, lskip_top, lskip_right+first_arrow_factor, lskip_top+first_arrow_factor, lskip_middle, 0.0, lskip_right+first_arrow_factor, lskip_bottom-first_arrow_factor, lskip_right, lskip_bottom, lskip_middle, lskip_top, lskip_middle+second_arrow_factor, lskip_top+second_arrow_factor, lskip_left, 0.0, lskip_middle+second_arrow_factor, lskip_bottom-second_arrow_factor, lskip_middle, lskip_bottom};
+    glBindBuffer(GL_ARRAY_BUFFER, lskip[1]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(lskip_points), lskip_points, GL_STATIC_DRAW);
+
+   GLfloat rskip_points[] = {rskip_left, rskip_top, rskip_left+third_arrow_factor, rskip_top-third_arrow_factor, rskip_middle, 0.0, rskip_left+third_arrow_factor, rskip_bottom+third_arrow_factor, rskip_left, rskip_bottom, rskip_middle, rskip_top, rskip_middle+fourth_arrow_factor, rskip_top-fourth_arrow_factor, rskip_right, 0.0, rskip_middle+fourth_arrow_factor, rskip_bottom+fourth_arrow_factor, rskip_middle, rskip_bottom};
+    glBindBuffer(GL_ARRAY_BUFFER, rskip[1]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(rskip_points), rskip_points, GL_STATIC_DRAW);
+}
+
 int main (void) {
 
     int i;
     int j;
+    //system("scrot -z /tmp/scr.png");
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         printf("SDL initialization failed: %s", SDL_GetError());
         return 1;
@@ -351,12 +395,8 @@ int main (void) {
     glBindVertexArray(lskip[0]);
     glGenBuffers(3, &lskip[1]);
     glBindBuffer(GL_ARRAY_BUFFER, lskip[1]);
-    left = -0.375;
-    right = -0.0625;
-    middle = -0.21785;
-    bottom = -0.15625;
-    top = -bottom;
-    GLfloat lskip_points[] = {right, top, right, top, middle, 0.0, right, bottom, right, bottom, middle, top, middle, top, left, 0.0, middle, bottom, middle, bottom};
+    GLfloat lskip_points[20] = { 0.0 };
+    
     glBufferData(GL_ARRAY_BUFFER, sizeof(lskip_points), lskip_points, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
@@ -389,19 +429,26 @@ int main (void) {
     glBindVertexArray(rskip[0]);
     glGenBuffers(3, &rskip[1]);
     glBindBuffer(GL_ARRAY_BUFFER, rskip[1]);
-    left = 0.375;
-    right = 0.0625;
-    middle = 0.21785;
-    bottom = -0.15625;
-    top = -bottom;
-    GLfloat rskip_points[] = {right, top, right, top, middle, 0.0, right, bottom, right, bottom, middle, top, middle, top, left, 0.0, middle, bottom, middle, bottom};
+    GLfloat rskip_points[20] = { 0.0 };
+    
     glBufferData(GL_ARRAY_BUFFER, sizeof(rskip_points), rskip_points, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
     glEnableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, rskip[2]);
     GLfloat rskip_colors[40];
-    for (i=0; i<40; i++) {
-        rskip_colors[i] = 1.0;
+    for (i=0; i<40; i+=4) {
+        if ((i/4 == 2) || (i/4 == 7)) {
+            rskip_colors[i] = 0.0;
+            rskip_colors[i+1] = 0.0;
+            rskip_colors[i+2] = 0.0;
+            rskip_colors[i+3] = 0.5;
+        }
+        else {
+            rskip_colors[i] = 1.0;
+            rskip_colors[i+1] = 1.0;
+            rskip_colors[i+2] = 1.0;
+            rskip_colors[i+3] = 1.0;
+        }
     }
     glBufferData(GL_ARRAY_BUFFER, sizeof(rskip_colors), rskip_colors, GL_STATIC_DRAW);
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
@@ -410,14 +457,17 @@ int main (void) {
     GLuint rskip_indices[] = {0, 1, 4, 1, 3, 4, 1, 2, 3, 5, 6, 9, 6, 8, 9, 6, 7, 8};
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(rskip_indices), rskip_indices, GL_STATIC_DRAW);
 
+
     //shaders
     GLuint shaderprogram = load_shaders("shader.vert", "shader.frag");
     GLuint ringshader = load_shaders("shader.vert", "ringshader.frag");
+    GLuint skipshader = load_shaders("shader.vert", "skipshader.frag");
     //Main Loop
     int quit = 0;
     Uint32 next_update = 0;
     int pause_state;
     SDL_Event e;
+    int drag = 0;
     while (!quit) {
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
@@ -433,6 +483,34 @@ int main (void) {
                     if (e.button.button == SDL_BUTTON_LEFT) {
                         printf("pause\n");
                         fifo_send("pause\n", 6);
+                    }
+                    else if (e.button.button == SDL_BUTTON_RIGHT) {
+                        drag = 1;
+                    }
+                    update_skip_arrows(skip_value, lskip, rskip);
+                    break;
+                case SDL_MOUSEBUTTONUP:
+                    if (e.button.button == SDL_BUTTON_RIGHT) {
+                        skip_value = 0;
+                        drag = 0;
+                        update_skip_arrows(skip_value, lskip, rskip);
+                    }
+                    break;
+                case SDL_MOUSEMOTION:
+                    if (drag == 1) {
+                        skip_value += e.motion.xrel;
+                        if (skip_value <= -100) {
+                            skip_value = 0;
+                            drag = 0;
+                            fifo_send("pt_step -1\n", 11);
+                        }
+
+                        if (skip_value >= 100) {
+                            skip_value = 0;
+                            drag = 0;
+                            fifo_send("pt_step 1\n", 10);
+                        }
+                        update_skip_arrows(skip_value, lskip, rskip);
                     }
                     break;
                 case SDL_WINDOWEVENT:
@@ -476,18 +554,23 @@ int main (void) {
         glUseProgram(ringshader);
         glBindVertexArray(ring_array);
         glDrawElements(GL_TRIANGLES, 600, GL_UNSIGNED_INT, NULL);
-        glUseProgram(shaderprogram);
-        if (pause_state == 0) {
-            //glBindVertexArray(play[0]);
-            //glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, NULL);
-            glBindVertexArray(lskip[0]);
-            glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, NULL);
-            //glBindVertexArray(rskip[0]);
-            //glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, NULL);
+        if (drag == 0) {
+            glUseProgram(shaderprogram);
+            if (pause_state == 0) {
+                glBindVertexArray(play[0]);
+                glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, NULL);
+            }
+            else {
+                glBindVertexArray(pause[0]);
+                glDrawElements(GL_TRIANGLES, 16, GL_UNSIGNED_INT, NULL);
+            }
         }
         else {
-            glBindVertexArray(pause[0]);
-            glDrawElements(GL_TRIANGLES, 16, GL_UNSIGNED_INT, NULL);
+            glUseProgram(skipshader);
+            glBindVertexArray(lskip[0]);
+            glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, NULL);
+            glBindVertexArray(rskip[0]);
+            glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, NULL);
         }
         //glDrawArrays(GL_TRIANGLE_FAN, 0, 101);
         SDL_GL_SwapWindow(window);
