@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -120,6 +121,46 @@ int get_pause (void) {
     }
     //printf("pause: %i\n", pause);
     return pause;
+}
+
+//vertex_list layout: { VAO, position VBO, color VBO, index buffer, number of vertices }
+GLuint *create_vertex_list (GLuint vertex_count) {
+    GLuint *vertex_list = malloc(5*sizeof(*vertex_list));
+    glGenVertexArrays(1, &vertex_list[0]);
+    glBindVertexArray(vertex_list[0]);
+    glGenBuffers(3, &vertex_list[1]);
+    vertex_list[4] = vertex_count;
+    return vertex_list;
+}
+
+void load_vertex_positions (GLuint *vertex_list, size_t list_size, GLfloat *list) {
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_list[1]);
+    glBufferData(GL_ARRAY_BUFFER, list_size, list, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+}
+
+void load_vertex_colors (GLuint *vertex_list, size_t list_size, GLfloat *list) {
+    glBindBuffer(GL_ARRAY_BUFFER, vertex_list[2]);
+    glBufferData(GL_ARRAY_BUFFER, list_size, list, GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(1);
+}
+
+void load_vertex_indices (GLuint *vertex_list, size_t list_size, GLuint *list) {
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vertex_list[3]);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, list_size, list, GL_STATIC_DRAW);
+}
+
+void draw_vertex_list (GLuint *vertex_list) {
+    glBindVertexArray(vertex_list[0]);
+    glDrawElements(GL_TRIANGLES, vertex_list[4], GL_UNSIGNED_INT, NULL);
+}
+
+void delete_vertex_list (GLuint *vertex_list) {
+    glDeleteBuffers(3, &vertex_list[1]);
+    glDeleteVertexArrays(1, &vertex_list[0]);
+    free(vertex_list);
 }
 
 GLuint load_shaders (char *vertex_path, char *fragment_path) {
@@ -285,21 +326,23 @@ int main (void) {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(outer_circle_indices), outer_circle_indices, GL_STATIC_DRAW);
 
     //Ring
-    GLuint ring_array;
-    glGenVertexArrays(1, &ring_array);
-    glBindVertexArray(ring_array);
-    GLuint ring[2];
-    glGenBuffers(2, ring);
-    glBindBuffer(GL_ARRAY_BUFFER, ring[0]);
+    //GLuint ring_array;
+    //glGenVertexArrays(1, &ring_array);
+    //glBindVertexArray(ring_array);
+    //GLuint ring[2];
+    //glGenBuffers(2, ring);
+    GLuint *ring = create_vertex_list(600);
+    //glBindBuffer(GL_ARRAY_BUFFER, ring[0]);
     GLfloat ring_points[400];
     for (i=0; i<200; i++) {
         ring_points[i] = points[i+2];
     }
     get_circle(&ring_points[200], 0, 0, 0.53125, 100, 0);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(ring_points), ring_points, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, ring[1]);
+    //glBufferData(GL_ARRAY_BUFFER, sizeof(ring_points), ring_points, GL_STATIC_DRAW);
+    //glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    //glEnableVertexAttribArray(0);
+    load_vertex_positions(ring, sizeof(ring_points), ring_points);
+    //glBindBuffer(GL_ARRAY_BUFFER, ring[1]);
     int progress = 1;
     GLfloat ring_colors[800];
     for (i=0; i<200; i++) {
@@ -317,9 +360,10 @@ int main (void) {
             ring_colors[j+3] = 0.3;
         }
     }
-    glBufferData(GL_ARRAY_BUFFER, sizeof(ring_colors), ring_colors, GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
+    //glBufferData(GL_ARRAY_BUFFER, sizeof(ring_colors), ring_colors, GL_STATIC_DRAW);
+    //glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    //glEnableVertexAttribArray(1);
+    load_vertex_colors(ring, sizeof(ring_colors), ring_colors);
     GLuint ring_indices[600];
     for (i=0; i<100; i++) {
         j = i*6;
@@ -330,42 +374,33 @@ int main (void) {
         ring_indices[j+4] = i+100;
         ring_indices[j+5] = (i+1)%100;
     }
-    GLuint ring_ibo;
-    glGenBuffers(1, &ring_ibo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ring_ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(ring_indices), ring_indices, GL_STATIC_DRAW);
+    //GLuint ring_ibo;
+    //glGenBuffers(1, &ring_ibo);
+    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ring_ibo);
+    //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(ring_indices), ring_indices, GL_STATIC_DRAW);
+    load_vertex_indices(ring, sizeof(ring_indices), ring_indices);
 
     //Play triangle
     //New approach: just put all GLuints in one array. Layout: [VAO, Position VBO, Color VBO, Index BO]
     //Actually, I don't need the IBO this time. But I want to try that out.
-    GLuint play[4];
-    glGenVertexArrays(1, &play[0]);
-    glBindVertexArray(play[0]);
-    glGenBuffers(3, &play[1]);
-    glBindBuffer(GL_ARRAY_BUFFER, play[1]);
+    GLuint *play = create_vertex_list(3);
+
     GLfloat play_points[6];
     get_circle(play_points, 0, 0, 0.375, 3, M_PI_2);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(play_points), play_points, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, play[2]);
+    load_vertex_positions(play, sizeof(play_points), play_points);
+
     GLfloat play_colors[16];
     for (i=0; i<16; i++) {
         play_colors[i] = 1.0;
     }
-    glBufferData(GL_ARRAY_BUFFER, sizeof(play_colors), play_colors, GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, play[3]);
+    load_vertex_colors(play, sizeof(play_colors), play_colors);
+
     GLuint play_indices[3] = { 0, 1, 2 };
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(play_indices), play_indices, GL_STATIC_DRAW);
+    load_vertex_indices(play, sizeof(play_indices), play_indices);
 
     //Pause bars
-    GLuint pause[4];
-    glGenVertexArrays(1, &pause[0]);
-    glBindVertexArray(pause[0]);
-    glGenBuffers(3, &pause[1]);
-    glBindBuffer(GL_ARRAY_BUFFER, pause[1]);
+    GLuint *pause = create_vertex_list(16);
+
     GLfloat left, bottom, top, right, middle;
     left = -0.375/sqrt(2);
     bottom = left;
@@ -373,20 +408,16 @@ int main (void) {
     top = right;
     middle = 0.25/sqrt(2);
     GLfloat pause_points[16] = {left, bottom, left+middle, bottom, left+middle, top, left, top, right-middle, bottom, right, bottom, right, top, right-middle, top};
-    glBufferData(GL_ARRAY_BUFFER, sizeof(pause_points), pause_points, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, pause[2]);
+    load_vertex_positions(pause, sizeof(pause_points), pause_points);
+
     GLfloat pause_colors[32];
     for (i=0; i<32; i++) {
         pause_colors[i] = 1.0;
     }
-    glBufferData(GL_ARRAY_BUFFER, sizeof(pause_colors), pause_colors, GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, pause[3]);
+    load_vertex_colors(pause, sizeof(pause_colors), pause_colors);
+
     GLuint pause_indices[12] = {0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7};
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(pause_indices), pause_indices, GL_STATIC_DRAW);
+    load_vertex_indices(pause, sizeof(pause_indices), pause_indices);
 
     int skip_value = 0;
     //left skip arrow
@@ -457,6 +488,17 @@ int main (void) {
     GLuint rskip_indices[] = {0, 1, 4, 1, 3, 4, 1, 2, 3, 5, 6, 9, 6, 8, 9, 6, 7, 8};
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(rskip_indices), rskip_indices, GL_STATIC_DRAW);
 
+    //background square with texture from screenshot (to simulate a transparent window)
+    //GLuint bg[5];
+    //glGenVertexArrays(1, &bg[0]);
+    //glBindVertexArray(bg[0]);
+    //glGenBuffers(3, &bg[1]);
+    //glBindBuffer(GL_ARRAY_BUFFER, gb[1]);
+    //GLfloat bg_points = { -1.0, -1.0, 1.0, -1.0, 1.0, 1.0, -1.0, 1.0 };
+    //glBufferData(GL_ARRAY_BUFFER, sizeof(bg_points), bg_points, GL_STATIC_DRAW);
+    //glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    //glEnableVertexAttribArray(0);
+    //glBindBuffer(GL_ARRAY_BUFFER, bg[2]);
 
     //shaders
     GLuint shaderprogram = load_shaders("shader.vert", "shader.frag");
@@ -534,20 +576,20 @@ int main (void) {
                     }
                     break;
                 case SDL_DROPFILE:
-                    {
-                    filename = e.drop.file;
-                    printf("File: %s, %lu\n", filename, strlen(filename));
-                    int command_length = 12+strlen(filename)+1;
-                    char loadfile_command[command_length];
-                    *loadfile_command = 0;
-                    strcat(loadfile_command, "loadfile ");
-                    strcat(loadfile_command, filename);
-                    strcat(loadfile_command, " 1\n");
-                    printf("%s\n", loadfile_command);
-                    fifo_send(loadfile_command, command_length-1);
-                    SDL_free(filename);
-                    fifo_send("pause\n", 6);
-                    }
+                    //{
+                    //filename = e.drop.file;
+                    //printf("File: %s, %lu\n", filename, strlen(filename));
+                    //int command_length = 12+strlen(filename)+1;
+                    //char loadfile_command[command_length];
+                    //*loadfile_command = 0;
+                    //strcat(loadfile_command, "loadfile ");
+                    //strcat(loadfile_command, filename);
+                    //strcat(loadfile_command, " 1\n");
+                    //printf("%s\n", loadfile_command);
+                    //fifo_send(loadfile_command, command_length-1);
+                    //SDL_free(filename);
+                    //fifo_send("pause\n", 6);
+                    //}
                     break;
                 default:
                     break;
@@ -572,7 +614,7 @@ int main (void) {
                     ring_colors[j+3] = 0.3;
                 }
             }
-            glBindBuffer(GL_ARRAY_BUFFER, ring[1]);
+            glBindBuffer(GL_ARRAY_BUFFER, ring[2]);
             glBufferData(GL_ARRAY_BUFFER, sizeof(ring_colors), ring_colors, GL_STATIC_DRAW);
 
             pause_state = get_pause();
@@ -583,17 +625,14 @@ int main (void) {
         glBindVertexArray(outer_circle_array);
         glDrawElements(GL_TRIANGLES, 300, GL_UNSIGNED_INT, NULL);
         glUseProgram(ringshader);
-        glBindVertexArray(ring_array);
-        glDrawElements(GL_TRIANGLES, 600, GL_UNSIGNED_INT, NULL);
+        draw_vertex_list(ring);
         if (drag_right == 0) {
             glUseProgram(shaderprogram);
             if (pause_state == 0) {
-                glBindVertexArray(play[0]);
-                glDrawElements(GL_TRIANGLES, 3, GL_UNSIGNED_INT, NULL);
+                draw_vertex_list(play);
             }
             else {
-                glBindVertexArray(pause[0]);
-                glDrawElements(GL_TRIANGLES, 16, GL_UNSIGNED_INT, NULL);
+                draw_vertex_list(pause);
             }
         }
         else {
@@ -611,6 +650,9 @@ int main (void) {
     glDisableVertexAttribArray(1);
     glDeleteBuffers(2, outer_circle);
     glDeleteVertexArrays(1, &outer_circle_array);
+    delete_vertex_list(pause);
+    delete_vertex_list(play);
+    delete_vertex_list(ring);
     SDL_GL_DeleteContext(context);
     SDL_DestroyWindow(window);
     SDL_Quit();
