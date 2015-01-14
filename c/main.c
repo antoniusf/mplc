@@ -14,6 +14,7 @@
 #define WINDOW_HEIGHT 640
 #define WINDOW_WIDTH_2 320
 #define WINDOW_HEIGHT_2 320
+#define SHOW_VOLUME_DELAY_MS 500
 
 float sq (float a) {
     return pow(a, 2);
@@ -92,6 +93,37 @@ int get_progress (void) {
         i++;
     }
     return progress;
+}
+
+int get_volume (void) {
+    fifo_send("get_property volume\n", 20);
+    char *header = "ANS_volume=";
+    char *answer = read_file_to_buffer("/tmp/mplo");
+    
+    int i=0;
+    char pos=0;
+    int volume;
+    while (answer[i] != 0) {
+        if (answer[i] == header[pos]) {
+            pos += 1;
+        }
+        else {
+            pos = 0;
+        }
+        if (pos ==  11) {
+            volume = answer[i+1]-48;//ASCII, you know?
+            if (answer[i+2] != 46) { //we don't need decimals, 46 is for .
+                volume *= 10;
+                volume += answer[i+2]-48;
+                if (answer[i+3] != 46) {//In case its 100
+                    volume *= 10;
+                }
+            }
+        }
+        i++;
+    }
+    printf("volume: %i\n", volume);
+    return volume;
 }
 
 int get_pause (void) {
@@ -289,20 +321,14 @@ int main (void) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     //Outer (big) circle
-    GLuint outer_circle_array;
-    glGenVertexArrays(1, &outer_circle_array);
-    glBindVertexArray(outer_circle_array);
-    GLuint outer_circle[2];
-    glGenBuffers(2, outer_circle);
-    glBindBuffer(GL_ARRAY_BUFFER, outer_circle[0]);
+    GLuint *outer_circle = create_vertex_list(300);
+
     GLfloat points[202];
     points[0] = 0.0;
     points[1] = 0.0;
     get_circle(&points[2], 0, 0, 0.625, 100, 0);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(points), points, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, outer_circle[1]);
+    load_vertex_positions(outer_circle, sizeof(points), points);
+
     GLfloat colors[404];
     for (i=0; i<404; i+=4) {
         colors[i] = 0.7;
@@ -310,9 +336,8 @@ int main (void) {
         colors[i+2] = 0.7;
         colors[i+3] = 0.5;
     }
-    glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
+    load_vertex_colors(outer_circle, sizeof(colors), colors);
+
     GLuint outer_circle_indices[300];
     for (i=0; i<100; i++) {
         outer_circle_indices[i*3] = 0;
@@ -320,29 +345,18 @@ int main (void) {
         outer_circle_indices[i*3+2] = i+2;
     }
     outer_circle_indices[299] = 1; //wrap around to the beginning
-    GLuint ibo;
-    glGenBuffers(1, &ibo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(outer_circle_indices), outer_circle_indices, GL_STATIC_DRAW);
+    load_vertex_indices(outer_circle, sizeof(outer_circle_indices), outer_circle_indices);
 
     //Ring
-    //GLuint ring_array;
-    //glGenVertexArrays(1, &ring_array);
-    //glBindVertexArray(ring_array);
-    //GLuint ring[2];
-    //glGenBuffers(2, ring);
     GLuint *ring = create_vertex_list(600);
-    //glBindBuffer(GL_ARRAY_BUFFER, ring[0]);
+
     GLfloat ring_points[400];
     for (i=0; i<200; i++) {
         ring_points[i] = points[i+2];
     }
     get_circle(&ring_points[200], 0, 0, 0.53125, 100, 0);
-    //glBufferData(GL_ARRAY_BUFFER, sizeof(ring_points), ring_points, GL_STATIC_DRAW);
-    //glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    //glEnableVertexAttribArray(0);
     load_vertex_positions(ring, sizeof(ring_points), ring_points);
-    //glBindBuffer(GL_ARRAY_BUFFER, ring[1]);
+
     int progress = 1;
     GLfloat ring_colors[800];
     for (i=0; i<200; i++) {
@@ -360,10 +374,8 @@ int main (void) {
             ring_colors[j+3] = 0.3;
         }
     }
-    //glBufferData(GL_ARRAY_BUFFER, sizeof(ring_colors), ring_colors, GL_STATIC_DRAW);
-    //glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
-    //glEnableVertexAttribArray(1);
     load_vertex_colors(ring, sizeof(ring_colors), ring_colors);
+
     GLuint ring_indices[600];
     for (i=0; i<100; i++) {
         j = i*6;
@@ -374,10 +386,6 @@ int main (void) {
         ring_indices[j+4] = i+100;
         ring_indices[j+5] = (i+1)%100;
     }
-    //GLuint ring_ibo;
-    //glGenBuffers(1, &ring_ibo);
-    //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ring_ibo);
-    //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(ring_indices), ring_indices, GL_STATIC_DRAW);
     load_vertex_indices(ring, sizeof(ring_indices), ring_indices);
 
     //Play triangle
@@ -421,16 +429,11 @@ int main (void) {
 
     int skip_value = 0;
     //left skip arrow
-    GLuint lskip[4];
-    glGenVertexArrays(1, &lskip[0]);
-    glBindVertexArray(lskip[0]);
-    glGenBuffers(3, &lskip[1]);
-    glBindBuffer(GL_ARRAY_BUFFER, lskip[1]);
+    GLuint *lskip = create_vertex_list(18);
+
     GLfloat lskip_points[20] = { 0.0 };
+    load_vertex_positions(lskip, sizeof(lskip_points), lskip_points);
     
-    glBufferData(GL_ARRAY_BUFFER, sizeof(lskip_points), lskip_points, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
     glBindBuffer(GL_ARRAY_BUFFER, lskip[2]);
     GLfloat lskip_colors[40];
     for (i=0; i<40; i+=4) {
@@ -447,25 +450,17 @@ int main (void) {
             lskip_colors[i+3] = 1.0;
         }
     }
-    glBufferData(GL_ARRAY_BUFFER, sizeof(lskip_colors), lskip_colors, GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, lskip[3]);
+    load_vertex_colors(lskip, sizeof(lskip_colors), colors);
+
     GLuint lskip_indices[] = {0, 1, 4, 1, 3, 4, 1, 2, 3, 5, 6, 9, 6, 8, 9, 6, 7, 8};
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(lskip_indices), lskip_indices, GL_STATIC_DRAW);
+    load_vertex_indices(lskip, sizeof(lskip_indices), lskip_indices);
 
     //right skip arrow
-    GLuint rskip[4];
-    glGenVertexArrays(1, &rskip[0]);
-    glBindVertexArray(rskip[0]);
-    glGenBuffers(3, &rskip[1]);
-    glBindBuffer(GL_ARRAY_BUFFER, rskip[1]);
+    GLuint *rskip = create_vertex_list(18);
+
     GLfloat rskip_points[20] = { 0.0 };
-    
-    glBufferData(GL_ARRAY_BUFFER, sizeof(rskip_points), rskip_points, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(0);
-    glBindBuffer(GL_ARRAY_BUFFER, rskip[2]);
+    load_vertex_positions(rskip, sizeof(rskip_points), rskip_points);
+
     GLfloat rskip_colors[40];
     for (i=0; i<40; i+=4) {
         if ((i/4 == 2) || (i/4 == 7)) {
@@ -481,12 +476,49 @@ int main (void) {
             rskip_colors[i+3] = 1.0;
         }
     }
-    glBufferData(GL_ARRAY_BUFFER, sizeof(rskip_colors), rskip_colors, GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
-    glEnableVertexAttribArray(1);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, rskip[3]);
+    load_vertex_colors(rskip, sizeof(rskip_colors), rskip_colors);
+
     GLuint rskip_indices[] = {0, 1, 4, 1, 3, 4, 1, 2, 3, 5, 6, 9, 6, 8, 9, 6, 7, 8};
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(rskip_indices), rskip_indices, GL_STATIC_DRAW);
+    load_vertex_indices(rskip, sizeof(rskip_indices), rskip_indices);
+
+    //volume bars
+    GLuint *bars = create_vertex_list(60);
+
+    GLfloat bars_points[80] = { 0.0 };
+    left = -0.07;
+    right = 0.07;
+    bottom = -0.36;
+
+    for (i=0; i<80; i+=8) {
+        bars_points[i] = left;
+        bars_points[i+1] = bottom;
+        bars_points[i+2] = right;
+        bars_points[i+3] = bottom;
+        bottom += 0.04;
+        bars_points[i+4] = right;
+        bars_points[i+5] = bottom;
+        bars_points[i+6] = left;
+        bars_points[i+7] = bottom;
+        bottom += 0.04;
+    }
+
+    load_vertex_positions(bars, sizeof(bars_points), bars_points);
+
+    GLfloat bars_colors[160] = { 1.0 };
+    load_vertex_colors(bars, sizeof(bars_colors), bars_colors);
+
+    GLuint bars_indices[60];
+
+    for (i=0; i<10; i++) {
+        bars_indices[i*6] = 0+i*4;
+        bars_indices[i*6+1] = 1+i*4;
+        bars_indices[i*6+2] = 2+i*4;
+
+        bars_indices[i*6+3] = 2+i*4;
+        bars_indices[i*6+4] = 3+i*4;
+        bars_indices[i*6+5] = 0+i*4;
+    }
+    load_vertex_indices(bars, sizeof(bars_indices), bars_indices);
 
     //background square with texture from screenshot (to simulate a transparent window)
     //GLuint bg[5];
@@ -508,11 +540,13 @@ int main (void) {
     int quit = 0;
     int quit_block = 0;
     Uint32 next_update = 0;
+    Uint32 show_volume_until = 0;
     int pause_state;
     SDL_Event e;
     int drag_right = 0;
     int drag_left = 0;
     char *filename;
+    int volume = get_volume();
     while (!quit) {
         while (SDL_PollEvent(&e)) {
             switch (e.type) {
@@ -529,6 +563,7 @@ int main (void) {
                         printf("pause\n");
                         fifo_send("pause\n", 6);
                         drag_left = 1;
+                        show_volume_until = 0; //Make sure the volume display goes away when the user clicks.
                     }
                     else if (e.button.button == SDL_BUTTON_RIGHT) {
                         drag_right = 1;
@@ -544,6 +579,64 @@ int main (void) {
                         drag_right = 0;
                         update_skip_arrows(skip_value, lskip, rskip);
                     }
+                    break;
+                case SDL_MOUSEWHEEL:
+                    {
+                        if (e.wheel.y > 0) {
+                            volume += 10;
+                        }
+                        else if (e.wheel.y < 0) {
+                            volume -= 10;
+                        }
+
+                        printf("change vol. to: %i\n", volume);
+
+                        if (volume <= 9) {
+                            if (volume < 0) { volume = 0; }
+                            char command[] = "volume x 1\n";
+                            command[7] = volume+48;
+                            printf("command: %s\n", command);
+                            fifo_send(command, 11);
+                        }
+                        else if (volume <= 99) {
+                            char command[] = "volume xx 1\n";
+                            int tens = volume/10;
+                            command[7] = tens+48;
+                            command[8] = volume-tens*10+48;
+                            printf("tens: %i; ones: %i; command: %s\n", tens, volume-tens*10, command);
+                            fifo_send(command, 12);
+                        }
+                        else if (volume >= 100) {
+                            volume = 100;
+                            char command[] = "volume 100 1\n";
+                            printf("command: %s\n", command);
+                            fifo_send(command, 13);
+                        }
+                        show_volume_until = SDL_GetTicks() + SHOW_VOLUME_DELAY_MS;
+
+                        for (i=0; i<10; i++) {
+                            if (i*10 < volume) {
+                                for (j=0; j<16; j+=4) {
+                                    bars_colors[i*16+j] = 1.0;
+                                    bars_colors[i*16+j+1] = 1.0;
+                                    bars_colors[i*16+j+2] = 1.0;
+                                    bars_colors[i*16+j+3] = 1.0;
+                                }
+                            }
+                            else {
+                                for (j=0; j<16; j+=4) {
+                                    bars_colors[i*16+j] = 0.0;
+                                    bars_colors[i*16+j+1] = 0.0;
+                                    bars_colors[i*16+j+2] = 0.0;
+                                    bars_colors[i*16+j+3] = 0.5;
+                                }
+                            }
+                        }
+                        
+                        glBindBuffer(GL_ARRAY_BUFFER, bars[2]);
+                        glBufferData(GL_ARRAY_BUFFER, sizeof(bars_colors), bars_colors, GL_STATIC_DRAW);
+                    }
+
                     break;
                 case SDL_MOUSEMOTION:
                     if (drag_right == 1) {
@@ -622,13 +715,15 @@ int main (void) {
         glUseProgram(shaderprogram);
         glClearColor(0.0, 0.0, 0.0, 1.0);
         glClear(GL_COLOR_BUFFER_BIT);
-        glBindVertexArray(outer_circle_array);
-        glDrawElements(GL_TRIANGLES, 300, GL_UNSIGNED_INT, NULL);
+        draw_vertex_list(outer_circle);
         glUseProgram(ringshader);
         draw_vertex_list(ring);
         if (drag_right == 0) {
             glUseProgram(shaderprogram);
-            if (pause_state == 0) {
+            if (SDL_GetTicks() < show_volume_until) {
+                draw_vertex_list(bars);
+            }
+            else if (pause_state == 0) {
                 draw_vertex_list(play);
             }
             else {
@@ -637,10 +732,8 @@ int main (void) {
         }
         else {
             glUseProgram(skipshader);
-            glBindVertexArray(lskip[0]);
-            glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, NULL);
-            glBindVertexArray(rskip[0]);
-            glDrawElements(GL_TRIANGLES, 18, GL_UNSIGNED_INT, NULL);
+            draw_vertex_list(lskip);
+            draw_vertex_list(rskip);
         }
         //glDrawArrays(GL_TRIANGLE_FAN, 0, 101);
         SDL_GL_SwapWindow(window);
@@ -648,11 +741,12 @@ int main (void) {
 
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
-    glDeleteBuffers(2, outer_circle);
-    glDeleteVertexArrays(1, &outer_circle_array);
+    delete_vertex_list(outer_circle);
     delete_vertex_list(pause);
     delete_vertex_list(play);
     delete_vertex_list(ring);
+    delete_vertex_list(lskip);
+    delete_vertex_list(rskip);
     SDL_GL_DeleteContext(context);
     SDL_DestroyWindow(window);
     SDL_Quit();
