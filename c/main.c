@@ -450,7 +450,7 @@ int main (void) {
             lskip_colors[i+3] = 1.0;
         }
     }
-    load_vertex_colors(lskip, sizeof(lskip_colors), colors);
+    load_vertex_colors(lskip, sizeof(lskip_colors), lskip_colors);
 
     GLuint lskip_indices[] = {0, 1, 4, 1, 3, 4, 1, 2, 3, 5, 6, 9, 6, 8, 9, 6, 7, 8};
     load_vertex_indices(lskip, sizeof(lskip_indices), lskip_indices);
