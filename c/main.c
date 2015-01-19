@@ -122,7 +122,7 @@ int get_volume (void) {
         }
         i++;
     }
-    printf("volume: %i\n", volume);
+    //printf("volume: %i\n", volume);
     return volume;
 }
 
@@ -597,15 +597,20 @@ int main (void) {
                         double circle_radius = 0.53125*WINDOW_WIDTH_2; //Translate into pixel coordinates; uses WINDOW_WIDTH_2 because whole OpenGL window is not 1, but 2 wide. TODO put this in some other place
                         if (polar[0] > circle_radius) {
                             polar[1] = polar[1]-M_PI_2; //The progress bar starts on top, not on the x axis
-                            if (polar[1] < 0) polar[1] += 2*M_PI; 
+                            if (polar[1] < 0) polar[1] += 2*M_PI; //TODO maybe use % here?
                             polar[1] = 2*M_PI-polar[1]; //The progress bar goes clockwise, so negate the angle
                             int new_pos = polar[1]/(2*M_PI)*100;
-                            printf("Seek to position: %i\%\n", new_pos);
-                            char *command = "seek 000 1\n";
-                            //fifo_send(command, 11);
+                            //printf("Seek to position: %i\%\n", new_pos);
+                            char command[] = "seek 000 1\n";
+                            command[7] = new_pos%10+48; //+48 for ASCII
+                            new_pos /= 10;
+                            command[6] = new_pos%10+48;
+                            if (new_pos >= 10) command[5] = 49;
+                            //printf("command: %s\n", command);
+                            fifo_send(command, 11);
                         }
                         else {
-                        printf("pause\n");
+                        //printf("pause\n");
                         fifo_send("pause\n", 6);
                         drag_left = 1;
                         show_volume_until = 0; //Make sure the volume display goes away when the user clicks.
@@ -635,13 +640,13 @@ int main (void) {
                             volume -= 10;
                         }
 
-                        printf("change vol. to: %i\n", volume);
+                        //printf("change vol. to: %i\n", volume);
 
                         if (volume <= 9) {
                             if (volume < 0) { volume = 0; }
                             char command[] = "volume x 1\n";
                             command[7] = volume+48;
-                            printf("command: %s\n", command);
+                            //printf("command: %s\n", command);
                             fifo_send(command, 11);
                         }
                         else if (volume <= 99) {
@@ -649,13 +654,13 @@ int main (void) {
                             int tens = volume/10;
                             command[7] = tens+48;
                             command[8] = volume-tens*10+48;
-                            printf("tens: %i; ones: %i; command: %s\n", tens, volume-tens*10, command);
+                            //printf("tens: %i; ones: %i; command: %s\n", tens, volume-tens*10, command);
                             fifo_send(command, 12);
                         }
                         else if (volume >= 100) {
                             volume = 100;
                             char command[] = "volume 100 1\n";
-                            printf("command: %s\n", command);
+                            //printf("command: %s\n", command);
                             fifo_send(command, 13);
                         }
                         show_volume_until = SDL_GetTicks() + SHOW_VOLUME_DELAY_MS;
@@ -738,6 +743,8 @@ int main (void) {
         if ( next_update < SDL_GetTicks() ) {
             next_update = SDL_GetTicks()+100;
             progress = get_progress();
+            if (progress > 99) progress = 99;
+            progress += 1;
             for (i=0; i<200; i++) {
                 j = i*4;
                 if (i%100 < progress) {
