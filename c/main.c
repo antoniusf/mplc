@@ -282,10 +282,42 @@ void update_skip_arrows (int skip_value, GLuint lskip[4], GLuint rskip[4]) {
     glBufferData(GL_ARRAY_BUFFER, sizeof(rskip_points), rskip_points, GL_STATIC_DRAW);
 }
 
+void cartesic_to_polar ( Sint32 x, Sint32 y, double result[2] ) {
+
+    double x2 = (double) x-WINDOW_WIDTH_2;
+    double y2 = (double) WINDOW_HEIGHT_2-y; //negated this, because SDLs y unit vector points down, not up
+
+    double length = sqrt(pow(x2, 2)+pow(y2, 2));
+    double angle;
+    if (x2 == 0) {
+        if (y2 >= 0) {
+            angle = M_PI_2;
+        }
+        else  {
+            angle = M_PI_2*3;
+        }
+    }
+
+    else if (x2 > 0) {
+        angle = atan(y2/x2);
+        if (angle < 0) { //Sometimes, you get the correct angle, but it is not given between 0 and 2*pi, instead it is below zero. Adding 2*pi doesn't change the angle, but brings it into the right interval.
+            angle = angle + M_PI*2;
+        }
+    }
+    else if (x2 < 0) {
+        angle = atan(y2/x2) + M_PI; //For x<0, arctan is always off by one period of tan, which is pi. This is due to the way arctan is defined.
+    }
+
+    result[0] = length;
+    result[1] = angle;
+}
+
 int main (void) {
 
     int i;
     int j;
+
+    fifo_send("get_property volume\n", 20); //XXX mplayer wants some time to answer; remove when /tmp/mplo answer communication channel is fixed
     //system("scrot -z /tmp/scr.png");
     if (SDL_Init(SDL_INIT_VIDEO) != 0) {
         printf("SDL initialization failed: %s", SDL_GetError());
@@ -560,10 +592,24 @@ int main (void) {
                     break;
                 case SDL_MOUSEBUTTONDOWN:
                     if (e.button.button == SDL_BUTTON_LEFT) {
+                        double polar[2];
+                        cartesic_to_polar(e.button.x, e.button.y, polar);
+                        double circle_radius = 0.53125*WINDOW_WIDTH_2; //Translate into pixel coordinates; uses WINDOW_WIDTH_2 because whole OpenGL window is not 1, but 2 wide. TODO put this in some other place
+                        if (polar[0] > circle_radius) {
+                            polar[1] = polar[1]-M_PI_2; //The progress bar starts on top, not on the x axis
+                            if (polar[1] < 0) polar[1] += 2*M_PI; 
+                            polar[1] = 2*M_PI-polar[1]; //The progress bar goes clockwise, so negate the angle
+                            int new_pos = polar[1]/(2*M_PI)*100;
+                            printf("Seek to position: %i\%\n", new_pos);
+                            char *command = "seek 000 1\n";
+                            //fifo_send(command, 11);
+                        }
+                        else {
                         printf("pause\n");
                         fifo_send("pause\n", 6);
                         drag_left = 1;
                         show_volume_until = 0; //Make sure the volume display goes away when the user clicks.
+                        }
                     }
                     else if (e.button.button == SDL_BUTTON_RIGHT) {
                         drag_right = 1;
