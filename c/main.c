@@ -220,7 +220,10 @@ GLuint load_shaders (char *vertex_path, char *fragment_path) {
     int isCompiled_FS;
     glGetShaderiv(fragmentshader, GL_COMPILE_STATUS, &isCompiled_FS);
     if (isCompiled_FS == 0) {
-        printf("OpenGL fragment shader compilation failed.\n");
+        GLchar *info_log = malloc(1000);
+        glGetShaderInfoLog(fragmentshader, 1000, NULL, info_log);
+        printf("OpenGL fragment shader compilation failed for file \"%s\". Log:\n%s\n", fragment_path, info_log);
+        free(info_log);
         return 0;
     }
 
@@ -616,7 +619,7 @@ int main (void) {
                         show_volume_until = 0; //Make sure the volume display goes away when the user clicks.
                         }
                     }
-                    else if (e.button.button == SDL_BUTTON_RIGHT) {
+                    else if (e.button.button == SDL_BUTTON_RIGHT || e.button.button == SDL_BUTTON_MIDDLE) {
                         drag_right = 1;
                     }
                     update_skip_arrows(skip_value, lskip, rskip);

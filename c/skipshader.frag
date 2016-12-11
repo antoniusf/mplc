@@ -4,7 +4,7 @@ precision highp float;
 
 in vec4 out_Color;
 
-out vec4 gl_FragColor;
+//out vec4 gl_FragColor;
 
 void main (void) {
     if (out_Color.a < 1.0) {
